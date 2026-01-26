@@ -82,7 +82,7 @@ export async function GET(request) {
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('cetrogar', ean) // <--- CAMBIO: Cetrogar (API Pública confirmada)
+    fetchVtexProduct('electronicamegatone', ean) // <--- CAMBIO: Cetrogar (API Pública confirmada)
   ]);
 
   return NextResponse.json({
