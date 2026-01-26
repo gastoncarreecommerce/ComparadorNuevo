@@ -7,6 +7,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   const buscar = async () => {
+    if (!ean) return;
     setLoading(true);
     setData(null);
     try {
@@ -17,81 +18,297 @@ export default function Home() {
     setLoading(false);
   };
 
-  const VtexCard = ({ product, storeName, color }) => {
+  // --- SUB-COMPONENTES DE UI ---
+
+  const Badge = ({ children, color }) => (
+    <span style={{ 
+      backgroundColor: `${color}15`, 
+      color: color, 
+      padding: '4px 10px', 
+      borderRadius: '20px', 
+      fontSize: '11px', 
+      fontWeight: '700',
+      letterSpacing: '0.5px',
+      textTransform: 'uppercase',
+      display: 'inline-block',
+      border: `1px solid ${color}30`
+    }}>
+      {children}
+    </span>
+  );
+
+  const ProductCard = ({ product, storeName, brandColor }) => {
+    const [activeTab, setActiveTab] = useState('desc'); // 'desc' | 'specs'
+
+    // Estado vacío o error
     if (!product || !product.found) {
         return (
-            <div style={{ padding: '20px', textAlign: 'center', border: '1px dashed #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', height: '100%', minHeight: '200px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <h3 style={{ color: color, marginTop: 0 }}>{storeName}</h3>
-                <p style={{ color: '#888', fontStyle: 'italic', fontSize: '13px' }}>Sin datos.</p>
+            <div className="card empty-card">
+                <div style={{ opacity: 0.5 }}>
+                    <h3 style={{ color: '#888' }}>{storeName}</h3>
+                    <p>Producto no catalogado</p>
+                </div>
             </div>
         );
     }
 
     return (
-      <div style={{ border: `1px solid ${color}`, borderRadius: '12px', padding: '15px', backgroundColor: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Cabecera */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '10px' }}>
-            <img src={product.thumbnail} style={{ width: '60px', height: '60px', objectFit: 'contain', marginRight: '10px' }} />
-            <div style={{ overflow: 'hidden' }}>
-                <h2 style={{ color: color, margin: '0 0 2px 0', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{storeName}</h2>
-                <a href={product.link} target="_blank" style={{ fontSize: '11px', color: '#555', textDecoration: 'none' }}>Ver en web ↗</a>
+      <div className="card" style={{ borderTop: `4px solid ${brandColor}` }}>
+        {/* Header Tarjeta */}
+        <div className="card-header">
+            <Badge color={brandColor}>{storeName}</Badge>
+            {product.price > 0 ? (
+                <span className="stock-ok">● En Stock</span>
+            ) : (
+                <span className="stock-no">● Sin Stock</span>
+            )}
+        </div>
+
+        {/* Imagen y Título */}
+        <div className="product-hero">
+            <div className="img-container">
+                <img src={product.thumbnail} alt={product.title} />
+            </div>
+            <a href={product.link} target="_blank" className="product-title" title="Ver en la web">
+                {product.title} <span style={{fontSize:'12px'}}>🔗</span>
+            </a>
+            <div className="product-price">
+                $ {product.price?.toLocaleString('es-AR')}
             </div>
         </div>
 
-        {/* Precio */}
-        <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-            <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#333' }}>$ {product.price?.toLocaleString('es-AR')}</span>
+        {/* Pestañas de Navegación */}
+        <div className="tabs">
+            <button 
+                className={`tab-btn ${activeTab === 'desc' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('desc')}
+            >
+                Descripción
+            </button>
+            <button 
+                className={`tab-btn ${activeTab === 'specs' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('specs')}
+            >
+                Ficha Técnica
+            </button>
         </div>
 
-        {/* Descripción (Scroll) */}
-        <div style={{ marginBottom: '10px', flex: 1 }}>
-            <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#999', fontWeight: 'bold', marginBottom: '5px' }}>Descripción</p>
-            <div 
-                dangerouslySetInnerHTML={{ __html: product.description }} 
-                style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '12px', color: '#666', lineHeight: '1.3', border: '1px solid #f0f0f0', padding: '8px', borderRadius: '6px', backgroundColor: '#fafafa' }}
-            />
-        </div>
+        {/* Contenido Scrollable */}
+        <div className="tab-content custom-scroll">
+            {activeTab === 'desc' && (
+                <div 
+                    className="html-desc"
+                    dangerouslySetInnerHTML={{ __html: product.description || '<p>Sin descripción.</p>' }} 
+                />
+            )}
 
-        {/* Specs (Scroll) */}
-        <div style={{ flex: 1, minHeight: '150px' }}>
-            <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#999', fontWeight: 'bold', marginBottom: '5px' }}>Ficha Técnica</p>
-            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', borderRadius: '8px', padding: '0 8px' }}>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {Object.entries(product.specs).map(([key, value]) => (
-                        <li key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f5f5f5', fontSize: '11px' }}>
-                            <span style={{ fontWeight: '600', color: '#444', marginRight: '5px' }}>{key}</span>
-                            <span style={{ color: '#666', textAlign: 'right', wordBreak: 'break-word', maxWidth: '60%' }}>{value}</span>
-                        </li>
-                    ))}
+            {activeTab === 'specs' && (
+                <ul className="specs-list">
+                    {Object.entries(product.specs).length > 0 ? (
+                        Object.entries(product.specs).map(([key, value]) => (
+                            <li key={key}>
+                                <strong>{key}</strong>
+                                <span>{value}</span>
+                            </li>
+                        ))
+                    ) : (
+                        <p style={{color: '#999', fontSize:'12px', textAlign:'center'}}>Sin datos técnicos.</p>
+                    )}
                 </ul>
-            </div>
+            )}
         </div>
       </div>
     );
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif', padding: '20px' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '10px' }}>Monitor de Catálogo VTEX</h1>
+    <div className="container">
+      {/* --- ESTILOS CSS EN LINEA PARA NEXT.JS --- */}
+      <style jsx global>{`
+        body { background-color: #f4f6f8; color: #1a202c; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; }
+        * { box-sizing: border-box; }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        
+        /* HEADER */
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; color: #1a202c; letter-spacing: -1px; }
+        .header p { color: #718096; font-size: 1.1rem; }
+
+        /* BUSCADOR */
+        .search-wrapper { 
+            background: white; 
+            padding: 10px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            display: flex; 
+            gap: 10px;
+            max-width: 700px;
+            margin: 0 auto 50px auto;
+            border: 1px solid #e2e8f0;
+        }
+        .search-input { 
+            flex: 1; 
+            border: none; 
+            padding: 15px 20px; 
+            font-size: 18px; 
+            outline: none; 
+            color: #2d3748;
+        }
+        .search-btn {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 0 40px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .search-btn:hover { background: #333; transform: translateY(-1px); }
+        .search-btn:disabled { background: #ccc; transform: none; }
+
+        /* GRID */
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); 
+            gap: 30px; 
+            align-items: start;
+        }
+
+        /* CARD DISEÑO PRO */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 600px; /* Altura fija para alineación */
+            display: flex;
+            flex-direction: column;
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        
+        .empty-card { 
+            border: 2px dashed #e2e8f0; 
+            background: #f7fafc; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+            box-shadow: none;
+        }
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        .stock-ok { color: #38a169; font-size: 11px; font-weight: 600; }
+        .stock-no { color: #e53e3e; font-size: 11px; font-weight: 600; }
+
+        .product-hero { text-align: center; margin-bottom: 20px; flex-shrink: 0; }
+        .img-container { height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
+        .img-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
+        
+        .product-title { 
+            display: block; 
+            font-size: 15px; 
+            line-height: 1.4; 
+            color: #2d3748; 
+            text-decoration: none; 
+            font-weight: 500; 
+            margin-bottom: 10px;
+            height: 42px; 
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .product-title:hover { color: #3182ce; }
+        
+        .product-price { font-size: 28px; font-weight: 800; color: #1a202c; letter-spacing: -0.5px; }
+
+        /* TABS */
+        .tabs { display: flex; border-bottom: 1px solid #e2e8f0; margin-bottom: 15px; }
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 10px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #718096;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: #4a5568; }
+        .tab-btn.active { color: #1a202c; border-bottom-color: #1a202c; }
+
+        /* CONTENIDO DE TABS */
+        .tab-content { flex: 1; overflow-y: auto; padding-right: 5px; font-size: 13px; color: #4a5568; line-height: 1.6; }
+        
+        /* SCROLL PERSONALIZADO */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+        /* ESTILOS DE DESCRIPCION HTML */
+        .html-desc p { margin-bottom: 10px; }
+        .html-desc img { max-width: 100%; height: auto; border-radius: 4px; margin: 10px 0; }
+        .html-desc ul { padding-left: 20px; }
+
+        /* LISTA DE SPECS */
+        .specs-list { list-style: none; padding: 0; margin: 0; }
+        .specs-list li { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #f7fafc; 
+        }
+        .specs-list li strong { color: #2d3748; font-weight: 600; margin-right: 10px; font-size: 12px; }
+        .specs-list li span { text-align: right; word-break: break-word; font-size: 12px; }
+
+      `}</style>
+
+      {/* HEADER */}
+      <div className="header">
+        <h1>Monitor VTEX</h1>
+        <p>Inteligencia de precios y catálogo en tiempo real</p>
+      </div>
       
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '40px', maxWidth: '600px', margin: '0 auto' }}>
+      {/* BUSCADOR */}
+      <div className="search-wrapper">
         <input 
-          style={{ flex: 1, padding: '15px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '16px' }}
+          className="search-input"
           value={ean} 
           onChange={(e) => setEan(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && buscar()}
-          placeholder="EAN (Ej: 8806090972740)"
+          placeholder="Escanea o escribe un EAN..."
+          autoFocus
         />
-        <button onClick={buscar} disabled={loading} style={{ padding: '0 30px', backgroundColor: '#000', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-          {loading ? '...' : 'Buscar'}
+        <button className="search-btn" onClick={buscar} disabled={loading}>
+          {loading ? 'Buscando...' : 'Analizar'}
         </button>
       </div>
 
+      {/* RESULTADOS */}
       {data && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-            <VtexCard product={data.carrefour} storeName="Carrefour" color="#1e429f" />
-            <VtexCard product={data.fravega} storeName="Frávega" color="#7526d9" />
-            <VtexCard product={data.oncity} storeName="OnCity" color="#ff4d00" />
+          <div className="grid">
+            <ProductCard 
+                product={data.carrefour} 
+                storeName="Carrefour" 
+                brandColor="#1e429f" // Azul Carrefour
+            />
+            <ProductCard 
+                product={data.fravega} 
+                storeName="Frávega" 
+                brandColor="#7526d9" // Violeta Frávega
+            />
+            <ProductCard 
+                product={data.oncity} 
+                storeName="OnCity" 
+                brandColor="#ff4d00" // Naranja OnCity
+            />
           </div>
       )}
     </div>
