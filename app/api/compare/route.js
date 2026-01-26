@@ -10,7 +10,7 @@ export async function GET(request) {
     const VTEX_KEY = process.env.VTEX_APP_KEY;
     const VTEX_TOKEN = process.env.VTEX_APP_TOKEN;
 
-    // USAMOS LA LLAVE MAESTRA CONFIRMADA: alternateIds_Ean
+    // Buscamos por alternateIds_Ean que es la clave que confirmamos que funciona
     const response = await fetch(`https://carrefourar.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`, {
       headers: { 
         'X-VTEX-API-AppKey': VTEX_KEY, 
@@ -26,16 +26,36 @@ export async function GET(request) {
 
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
-      // Buscamos el precio dentro de la estructura de vendedores
+      
+      // --- LOGICA DE EXTRACCIÓN DE ESPECIFICACIONES ---
+      let specs = {};
+      
+      // 1. Intentamos sacar especificaciones técnicas listadas en 'allSpecifications'
+      if (item.allSpecifications && Array.isArray(item.allSpecifications)) {
+        item.allSpecifications.forEach(specName => {
+            // En VTEX, el valor de la spec viene en un array (ej: item['Envase Tipo'] = ['PET'])
+            if (item[specName] && item[specName].length > 0) {
+                specs[specName] = item[specName][0];
+            }
+        });
+      }
+
+      // 2. Construimos una descripción si la oficial viene vacía
+      const description = item.description || item.metaTagDescription || item.productName;
+
+      // 3. Precio
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
       
-      if (offer && offer.Price > 0) {
+      if (offer) {
         return NextResponse.json({
           found: true,
           title: item.productName,
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
-          link: item.link
+          link: item.link,
+          // Agregamos los nuevos datos al JSON de respuesta
+          description: description,
+          specs: specs 
         });
       }
     }
