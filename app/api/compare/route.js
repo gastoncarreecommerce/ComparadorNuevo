@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-// Función auxiliar para consultar cualquier tienda VTEX
+// Función genérica para consultar cualquier VTEX
 async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
   try {
     const headers = { 'Accept': 'application/json' };
@@ -9,18 +9,27 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
       headers['X-VTEX-API-AppToken'] = appToken;
     }
 
-    // Buscamos por EAN (alternateIds_Ean) que es el estándar de oro en VTEX
+    // Buscamos por EAN (La llave maestra de VTEX)
     const url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
     
-    const res = await fetch(url, { headers, cache: 'no-store' });
+    // Timeout de 4s para que no se cuelgue si una tienda tarda
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(url, { 
+        headers, 
+        cache: 'no-store',
+        signal: controller.signal 
+    });
+    clearTimeout(timeoutId);
     
-    if (!res.ok) return { found: false };
+    if (!res.ok) return { found: false, store: accountName };
     const data = await res.json();
 
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
       
-      // Extraer Specs
+      // 1. Extraer Specs (Atributos técnicos)
       let specs = {};
       if (item.allSpecifications && Array.isArray(item.allSpecifications)) {
         item.allSpecifications.forEach(specName => {
@@ -30,15 +39,18 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
         });
       }
 
-      // Extraer Descripción (HTML o Meta)
-      const description = item.description || item.metaTagDescription;
+      // 2. Extraer Descripción (HTML rico para tu catálogo)
+      const description = item.description || item.metaTagDescription || "";
 
-      // Extraer Precio
+      // 3. Extraer Precio (Si hay stock)
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
       
-      if (offer && offer.Price > 0) {
+      // Nota: A veces queremos la info aunque no haya stock/precio. 
+      // Si solo quieres info para catálogo, podrías quitar la validación de 'offer.Price > 0'
+      if (offer) {
         return {
           found: true,
+          store: accountName,
           title: item.productName,
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
@@ -48,10 +60,10 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
         };
       }
     }
-    return { found: false };
+    return { found: false, store: accountName };
   } catch (e) {
-    console.error(`Error fetching ${accountName}:`, e);
-    return { found: false, error: e.message };
+    console.error(`Error fetching ${accountName}:`, e.message);
+    return { found: false, store: accountName };
   }
 }
 
@@ -61,15 +73,19 @@ export async function GET(request) {
 
   if (!ean) return NextResponse.json({ error: 'Falta EAN' }, { status: 400 });
 
-  // Credenciales Carrefour (Frávega suele ser público)
   const C_KEY = process.env.VTEX_APP_KEY;
   const C_TOKEN = process.env.VTEX_APP_TOKEN;
 
-  // Ejecutamos en paralelo
-  const [carrefour, fravega] = await Promise.all([
+  // COMPARACIÓN TRIPLE: Carrefour vs Frávega vs Jumbo
+  const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
-    fetchVtexProduct('fravega', ean) // Frávega API Publica
+    fetchVtexProduct('fravega', ean),
+    fetchVtexProduct('jumboargentina', ean) // <--- NUEVO: Jumbo
   ]);
 
-  return NextResponse.json({ carrefour, fravega });
+  return NextResponse.json({
+      carrefour: results[0],
+      fravega: results[1],
+      jumbo: results[2]
+  });
 }
