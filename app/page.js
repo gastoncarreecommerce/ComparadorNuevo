@@ -1,85 +1,64 @@
-// app/page.js
 'use client';
 import { useState } from 'react';
 
 export default function Home() {
   const [ean, setEan] = useState('');
-  const [result, setResult] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = async () => {
-    if (!ean) return;
+  const buscar = async () => {
     setLoading(true);
-    setResult(null);
-
-    // Llamamos a NUESTRA propia API, no a las externas
     const res = await fetch(`/api/compare?ean=${ean}`);
-    const data = await res.json();
-    
-    setResult(data);
+    const json = await res.json();
+    setData(json);
     setLoading(false);
   };
 
+  const cardStyle = { background: 'white', padding: '20px', borderRadius: '8px', flex: 1, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' };
+
   return (
-    <div className="min-h-screen bg-gray-100 p-8 font-sans">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8">Comparador EAN</h1>
-        
-        {/* Buscador */}
-        <div className="flex gap-2 mb-10 justify-center">
-          <input 
-            type="text" 
-            placeholder="Ingresa código EAN (ej: 7791290790978)" 
-            className="p-3 border rounded w-full max-w-md"
-            value={ean}
-            onChange={(e) => setEan(e.target.value)}
-          />
-          <button 
-            onClick={handleSearch}
-            disabled={loading}
-            className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            {loading ? 'Buscando...' : 'Comparar'}
-          </button>
-        </div>
-
-        {/* Resultados */}
-        {result && (
-          <div className="grid md:grid-cols-2 gap-6">
-            
-            {/* Tarjeta MELI */}
-            <div className="bg-white p-6 rounded shadow border-t-4 border-yellow-400">
-              <h2 className="text-xl font-bold mb-4 text-yellow-600">Mercado Libre</h2>
-              {result.meli.found ? (
-                <>
-                  <img src={result.meli.image} alt="Meli" className="h-32 mx-auto mb-4 object-contain"/>
-                  <h3 className="font-semibold">{result.meli.title}</h3>
-                  <p className="text-2xl font-bold mt-2">$ {result.meli.price.toLocaleString()}</p>
-                  <a href={result.meli.link} target="_blank" className="block mt-4 text-blue-500 hover:underline">Ver Publicación</a>
-                </>
-              ) : (
-                <p className="text-gray-500">No encontrado en MeLi</p>
-              )}
-            </div>
-
-            {/* Tarjeta Carrefour */}
-            <div className="bg-white p-6 rounded shadow border-t-4 border-blue-600">
-              <h2 className="text-xl font-bold mb-4 text-blue-800">Carrefour</h2>
-              {result.carrefour.found ? (
-                <>
-                  <img src={result.carrefour.image} alt="Carrefour" className="h-32 mx-auto mb-4 object-contain"/>
-                  <h3 className="font-semibold">{result.carrefour.title}</h3>
-                  <p className="text-2xl font-bold mt-2">$ {result.carrefour.price.toLocaleString()}</p>
-                  <a href="#" className="block mt-4 text-blue-500 hover:underline">Ver en Web</a>
-                </>
-              ) : (
-                <p className="text-gray-500">No encontrado en VTEX</p>
-              )}
-            </div>
-
-          </div>
-        )}
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
+      <h1 style={{ textAlign: 'center' }}>Comparador EAN</h1>
+      
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
+        <input 
+          value={ean} 
+          onChange={(e) => setEan(e.target.value)}
+          placeholder="Ej: 7791290790978"
+          style={{ flex: 1, padding: '10px', fontSize: '16px' }}
+        />
+        <button onClick={buscar} disabled={loading} style={{ padding: '10px 20px', cursor: 'pointer' }}>
+          {loading ? 'Buscando...' : 'Comparar'}
+        </button>
       </div>
+
+      {data && (
+        <div style={{ display: 'flex', gap: '20px', flexDirection: 'row' }}>
+            {/* MELI */}
+            <div style={{ ...cardStyle, borderTop: '5px solid #ffe600' }}>
+                <h2>Mercado Libre</h2>
+                {data.meli.found ? (
+                    <div>
+                        <img src={data.meli.thumbnail} style={{ height: '100px' }} />
+                        <p><b>{data.meli.title}</b></p>
+                        <p style={{ fontSize: '24px' }}>$ {data.meli.price}</p>
+                        <a href={data.meli.permalink} target="_blank">Ver producto</a>
+                    </div>
+                ) : <p>No encontrado</p>}
+            </div>
+
+            {/* CARREFOUR */}
+            <div style={{ ...cardStyle, borderTop: '5px solid #1e40af' }}>
+                <h2>Carrefour</h2>
+                {data.carrefour.found ? (
+                    <div>
+                        <p><b>{data.carrefour.title}</b></p>
+                        <p style={{ fontSize: '24px' }}>$ {data.carrefour.price}</p>
+                    </div>
+                ) : <p>No encontrado en API VTEX</p>}
+            </div>
+        </div>
+      )}
     </div>
   );
 }
