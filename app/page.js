@@ -272,7 +272,7 @@ export default function Home() {
 
       {/* HEADER */}
       <div className="header">
-        <h1>Monitor VTEX</h1>
+        <h1>EAN RADAR 🛒</h1>
         <p>Inteligencia de precios y catálogo en tiempo real</p>
       </div>
       
