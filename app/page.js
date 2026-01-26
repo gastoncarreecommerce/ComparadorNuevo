@@ -17,7 +17,6 @@ export default function Home() {
     setLoading(false);
   };
 
-  // Componente de Tarjeta (Igual que antes, sin cambios de lógica)
   const VtexCard = ({ product, storeName, color }) => {
     if (!product || !product.found) {
         return (
@@ -89,11 +88,10 @@ export default function Home() {
       </div>
 
       {data && (
-          // GRID RESPONSIVO: Se adapta si son 2, 3 o 4 tiendas
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
             <VtexCard product={data.carrefour} storeName="Carrefour" color="#1e429f" />
             <VtexCard product={data.fravega} storeName="Frávega" color="#7526d9" />
-            <VtexCard product={data.jumbo} storeName="Jumbo Retail" color="#009e0f" />
+            <VtexCard product={data.oncity} storeName="OnCity" color="#ff4d00" />
           </div>
       )}
     </div>
