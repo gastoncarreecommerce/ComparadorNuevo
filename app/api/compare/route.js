@@ -12,7 +12,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     // Buscamos por EAN (La llave maestra de VTEX)
     const url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
     
-    // Timeout de 4s para que no se cuelgue si una tienda tarda
+    // Timeout de 4s para evitar cuellos de botella
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
@@ -29,7 +29,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
       
-      // 1. Extraer Specs (Atributos técnicos)
+      // 1. Extraer Specs
       let specs = {};
       if (item.allSpecifications && Array.isArray(item.allSpecifications)) {
         item.allSpecifications.forEach(specName => {
@@ -39,14 +39,12 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
         });
       }
 
-      // 2. Extraer Descripción (HTML rico para tu catálogo)
+      // 2. Extraer Descripción
       const description = item.description || item.metaTagDescription || "";
 
-      // 3. Extraer Precio (Si hay stock)
+      // 3. Extraer Precio
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
       
-      // Nota: A veces queremos la info aunque no haya stock/precio. 
-      // Si solo quieres info para catálogo, podrías quitar la validación de 'offer.Price > 0'
       if (offer) {
         return {
           found: true,
@@ -76,16 +74,16 @@ export async function GET(request) {
   const C_KEY = process.env.VTEX_APP_KEY;
   const C_TOKEN = process.env.VTEX_APP_TOKEN;
 
-  // COMPARACIÓN TRIPLE: Carrefour vs Frávega vs Jumbo
+  // COMPARACIÓN: Carrefour vs Frávega vs OnCity
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('jumboargentina', ean) // <--- NUEVO: Jumbo
+    fetchVtexProduct('oncity', ean) // <--- CAMBIO: OnCity en lugar de Jumbo
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
-      jumbo: results[2]
+      oncity: results[2]
   });
 }
