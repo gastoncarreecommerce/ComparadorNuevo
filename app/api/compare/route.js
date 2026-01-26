@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-// Función genérica para consultar cualquier VTEX
+// Función "Blindada" para consultar VTEX (Intenta EAN exacto, y si falla, busca texto)
 async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
   try {
     const headers = { 'Accept': 'application/json' };
@@ -9,27 +9,30 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
       headers['X-VTEX-API-AppToken'] = appToken;
     }
 
-    // Buscamos por EAN (La llave maestra de VTEX)
-    const url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
-    
-    // Timeout de 4s para evitar cuellos de botella
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
 
-    const res = await fetch(url, { 
-        headers, 
-        cache: 'no-store',
-        signal: controller.signal 
-    });
-    clearTimeout(timeoutId);
+    // ESTRATEGIA 1: Búsqueda Técnica (Exacta por EAN)
+    let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
     
-    if (!res.ok) return { found: false, store: accountName };
-    const data = await res.json();
+    let res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
+    let data = res.ok ? await res.json() : [];
+
+    // ESTRATEGIA 2: Búsqueda de Texto (Si la técnica falló)
+    // Esto salva las papas cuando el EAN no está cargado en el campo técnico pero sí en el producto
+    if (!Array.isArray(data) || data.length === 0) {
+        // console.log(`[${accountName}] Falló búsqueda técnica, intentando Full Text...`);
+        url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}&sc=1`;
+        res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
+        data = res.ok ? await res.json() : [];
+    }
+    
+    clearTimeout(timeoutId);
 
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
       
-      // 1. Extraer Specs
+      // Extraer Specs
       let specs = {};
       if (item.allSpecifications && Array.isArray(item.allSpecifications)) {
         item.allSpecifications.forEach(specName => {
@@ -39,16 +42,16 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
         });
       }
 
-      // 2. Extraer Descripción
+      // Extraer Descripción (Prioridad al HTML rico)
       const description = item.description || item.metaTagDescription || "";
 
-      // 3. Extraer Precio
+      // Extraer Precio
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
       
       if (offer) {
         return {
           found: true,
-          store: accountName,
+          store: accountName, // Para identificar quién respondió
           title: item.productName,
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
@@ -59,6 +62,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
       }
     }
     return { found: false, store: accountName };
+
   } catch (e) {
     console.error(`Error fetching ${accountName}:`, e.message);
     return { found: false, store: accountName };
@@ -74,16 +78,16 @@ export async function GET(request) {
   const C_KEY = process.env.VTEX_APP_KEY;
   const C_TOKEN = process.env.VTEX_APP_TOKEN;
 
-  // COMPARACIÓN: Carrefour vs Frávega vs OnCity
+  // Ejecutamos las 3 tiendas en paralelo
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('oncityar', ean) // <--- CAMBIO: OnCity en lugar de Jumbo
+    fetchVtexProduct('cetrogar', ean) // <--- CAMBIO: Cetrogar (API Pública confirmada)
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
-      oncity: results[2]
+      cetrogar: results[2]
   });
 }
