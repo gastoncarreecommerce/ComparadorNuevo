@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 
+// Mapa de dominios públicos para corregir los enlaces de VTEX
+const DOMAIN_MAP = {
+  'carrefourar': 'https://www.carrefour.com.ar',
+  'fravega': 'https://www.fravega.com',
+  'aremsaprod': 'https://www.oncity.com'
+};
+
 // Función "Blindada" para consultar VTEX (Intenta EAN exacto, y si falla, busca texto)
 async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
   try {
@@ -10,10 +17,9 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     // ESTRATEGIA 1: Búsqueda Técnica (Exacta por EAN)
-    // Usamos el accountName real que encontraste: 'aremsaprod'
     let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
     
     let res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
@@ -41,13 +47,25 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
         });
       }
 
-      // Extraer Descripción (Prioridad al HTML rico)
+      // Extraer Descripción
       const description = item.description || item.metaTagDescription || "";
 
       // Extraer Precio
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
+
+      // --- CORRECCIÓN DE ENLACE ---
+      let publicLink = item.link;
+      try {
+        // Extraemos el path (ej: /producto/p) y le ponemos el dominio público
+        const urlObj = new URL(item.link);
+        const publicDomain = DOMAIN_MAP[accountName];
+        if (publicDomain) {
+          publicLink = `${publicDomain}${urlObj.pathname}`;
+        }
+      } catch (error) {
+        console.error(`Error construyendo enlace público para ${accountName}:`, error);
+      }
       
-      // Enviamos el dato aunque no haya precio (para que te sirva la ficha técnica)
       if (offer) {
         return {
           found: true,
@@ -55,7 +73,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
           title: item.productName,
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
-          link: item.link,
+          link: publicLink, // <--- Usamos el enlace corregido
           description: description,
           specs: specs
         };
@@ -78,17 +96,15 @@ export async function GET(request) {
   const C_KEY = process.env.VTEX_APP_KEY;
   const C_TOKEN = process.env.VTEX_APP_TOKEN;
 
-  // Ejecutamos las 3 tiendas en paralelo
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    // EL DATO DE ORO: aremsaprod es la cuenta real de OnCity
-    fetchVtexProduct('aremsaprod', ean) 
+    fetchVtexProduct('aremsaprod', ean) // Cuenta real de OnCity
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
-      oncity: results[2] // Lo mapeamos a 'oncity' para que el frontend no cambie
+      oncity: results[2]
   });
 }
