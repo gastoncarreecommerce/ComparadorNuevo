@@ -13,15 +13,14 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
 
     // ESTRATEGIA 1: Búsqueda Técnica (Exacta por EAN)
+    // Usamos el accountName real que encontraste: 'aremsaprod'
     let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
     
     let res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
     let data = res.ok ? await res.json() : [];
 
     // ESTRATEGIA 2: Búsqueda de Texto (Si la técnica falló)
-    // Esto salva las papas cuando el EAN no está cargado en el campo técnico pero sí en el producto
     if (!Array.isArray(data) || data.length === 0) {
-        // console.log(`[${accountName}] Falló búsqueda técnica, intentando Full Text...`);
         url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}&sc=1`;
         res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
         data = res.ok ? await res.json() : [];
@@ -48,10 +47,11 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
       // Extraer Precio
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
       
+      // Enviamos el dato aunque no haya precio (para que te sirva la ficha técnica)
       if (offer) {
         return {
           found: true,
-          store: accountName, // Para identificar quién respondió
+          store: accountName,
           title: item.productName,
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
@@ -82,12 +82,13 @@ export async function GET(request) {
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('megatone', ean) // <--- CAMBIO: Cetrogar (API Pública confirmada)
+    // EL DATO DE ORO: aremsaprod es la cuenta real de OnCity
+    fetchVtexProduct('aremsaprod', ean) 
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
-      cetrogar: results[2]
+      oncity: results[2] // Lo mapeamos a 'oncity' para que el frontend no cambie
   });
 }
