@@ -78,7 +78,7 @@ export async function GET(request) {
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('oncity', ean) // <--- CAMBIO: OnCity en lugar de Jumbo
+    fetchVtexProduct('oncityar', ean) // <--- CAMBIO: OnCity en lugar de Jumbo
   ]);
 
   return NextResponse.json({
