@@ -18,7 +18,7 @@ export default function Home() {
       .then(data => {
         if (data.results && data.results.length > 0) {
           const item = data.results[0];
-          // Filtramos atributos importantes de MeLi (Marca, Modelo, etc)
+          // Obtenemos atributos de MeLi
           const attributes = item.attributes?.filter(a => a.id === 'BRAND' || a.id === 'MODEL' || a.id === 'PACKAGE_TYPE' || a.id === 'VOLUME') || [];
           
           setMeliData({ 
@@ -26,7 +26,10 @@ export default function Home() {
             title: item.title, 
             thumbnail: item.thumbnail, 
             permalink: item.permalink,
-            specs: attributes // Guardamos los atributos
+            specs: attributes,
+            // MeLi no suele dar la descripción completa en la búsqueda, requiere otra llamada a /items/{id}/description
+            // Por ahora dejamos placeholder o título
+            description: item.title 
           });
         } else {
           setMeliData({ found: false });
@@ -43,47 +46,60 @@ export default function Home() {
     setLoading(false);
   };
 
-  // Componente auxiliar para renderizar la tabla de specs
-  const SpecsTable = ({ data, source }) => {
+  // Componente de Tabla + Descripción
+  const ProductCard = ({ data, source }) => {
     if (!data.found) return <p style={{ color: '#666', fontStyle: 'italic' }}>No encontrado</p>;
 
     return (
       <div style={{ fontSize: '14px', textAlign: 'left' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+        {/* Cabecera */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #eee' }}>
             <img src={data.thumbnail} style={{ width: '60px', height: '60px', objectFit: 'contain', marginRight: '10px' }} />
-            <h3 style={{ fontSize: '14px', margin: 0, lineHeight: '1.2' }}>{data.title}</h3>
+            <div>
+              <h3 style={{ fontSize: '14px', margin: '0 0 5px 0', lineHeight: '1.2' }}>{data.title}</h3>
+              {data.price && <span style={{ fontWeight: 'bold', color: '#333', fontSize: '16px' }}>$ {data.price.toLocaleString('es-AR')}</span>}
+            </div>
         </div>
 
-        <div style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '8px' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '12px', textTransform: 'uppercase', color: '#888' }}>Ficha Técnica</h4>
+        {/* Descripción (SEO) */}
+        {data.description && (
+            <div style={{ marginBottom: '15px' }}>
+                <h4 style={{ margin: '0 0 5px 0', fontSize: '11px', textTransform: 'uppercase', color: '#999', letterSpacing: '1px' }}>Descripción</h4>
+                <div 
+                    // IMPORTANTE: Esto renderiza el HTML que viene de VTEX
+                    dangerouslySetInnerHTML={{ __html: data.description }} 
+                    style={{ fontSize: '13px', color: '#555', lineHeight: '1.5', maxHeight: '150px', overflowY: 'auto', border: '1px solid #f0f0f0', padding: '8px', borderRadius: '4px' }} 
+                />
+            </div>
+        )}
+
+        {/* Ficha Técnica */}
+        <div style={{ backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '8px' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '11px', textTransform: 'uppercase', color: '#999', letterSpacing: '1px' }}>Especificaciones</h4>
             
-            {/* Renderizado para Carrefour (Objeto Clave-Valor) */}
+            {/* Specs Carrefour */}
             {source === 'carrefour' && data.specs && (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {Object.entries(data.specs).slice(0, 8).map(([key, value]) => (
-                        <li key={key} style={{ borderBottom: '1px solid #ddd', padding: '5px 0', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontWeight: 'bold', color: '#555' }}>{key}:</span>
-                            <span>{value}</span>
+                    {Object.entries(data.specs).slice(0, 6).map(([key, value]) => (
+                        <li key={key} style={{ borderBottom: '1px solid #e0e0e0', padding: '4px 0', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ fontWeight: '600', color: '#444' }}>{key}:</span>
+                            <span style={{ color: '#666' }}>{value}</span>
                         </li>
                     ))}
                 </ul>
             )}
 
-            {/* Renderizado para Mercado Libre (Array de Objetos) */}
+            {/* Specs Mercado Libre */}
             {source === 'meli' && data.specs && (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {data.specs.map((attr) => (
-                        <li key={attr.id} style={{ borderBottom: '1px solid #ddd', padding: '5px 0', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontWeight: 'bold', color: '#555' }}>{attr.name}:</span>
-                            <span>{attr.value_name}</span>
+                        <li key={attr.id} style={{ borderBottom: '1px solid #e0e0e0', padding: '4px 0', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ fontWeight: '600', color: '#444' }}>{attr.name}:</span>
+                            <span style={{ color: '#666' }}>{attr.value_name}</span>
                         </li>
                     ))}
                 </ul>
             )}
-            
-            {(!data.specs || (Array.isArray(data.specs) && data.specs.length === 0) || (typeof data.specs === 'object' && Object.keys(data.specs).length === 0)) && 
-                <p>Sin especificaciones detalladas.</p>
-            }
         </div>
       </div>
     );
@@ -91,7 +107,7 @@ export default function Home() {
 
   return (
     <div style={{ maxWidth: '900px', margin: '40px auto', fontFamily: 'sans-serif', padding: '20px' }}>
-      <h1 style={{ textAlign: 'center', color: '#333' }}>Comparador de Fichas Técnicas</h1>
+      <h1 style={{ textAlign: 'center', color: '#333' }}>Comparador SEO & Ficha</h1>
       
       <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
         <input 
@@ -108,15 +124,15 @@ export default function Home() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Columna Mercado Libre */}
-        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ color: '#dba900', marginTop: 0, fontSize: '18px' }}>Mercado Libre</h2>
-          {meliData ? <SpecsTable data={meliData} source="meli" /> : <p style={{color:'#ccc'}}>Esperando...</p>}
+        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', background: '#fff' }}>
+          <h2 style={{ color: '#dba900', marginTop: 0, fontSize: '18px', borderBottom: '2px solid #dba900', display: 'inline-block', paddingBottom: '5px' }}>Mercado Libre</h2>
+          {meliData ? <ProductCard data={meliData} source="meli" /> : <p style={{color:'#ccc'}}>Esperando...</p>}
         </div>
 
         {/* Columna Carrefour */}
-        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ color: '#1e429f', marginTop: 0, fontSize: '18px' }}>Carrefour</h2>
-          {carrefourData ? <SpecsTable data={carrefourData} source="carrefour" /> : <p style={{color:'#ccc'}}>Esperando...</p>}
+        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', background: '#fff' }}>
+          <h2 style={{ color: '#1e429f', marginTop: 0, fontSize: '18px', borderBottom: '2px solid #1e429f', display: 'inline-block', paddingBottom: '5px' }}>Carrefour</h2>
+          {carrefourData ? <ProductCard data={carrefourData} source="carrefour" /> : <p style={{color:'#ccc'}}>Esperando...</p>}
         </div>
       </div>
     </div>
