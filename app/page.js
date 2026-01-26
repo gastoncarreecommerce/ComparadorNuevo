@@ -12,18 +12,21 @@ export default function Home() {
     setMeliData(null);
     setCarrefourData(null);
 
-    // 1. MERCADO LIBRE (Desde el navegador del usuario)
+    // 1. MERCADO LIBRE
     fetch(`https://api.mercadolibre.com/sites/MLA/search?q=${ean}&limit=1`)
       .then(res => res.json())
       .then(data => {
         if (data.results && data.results.length > 0) {
           const item = data.results[0];
+          // Filtramos atributos importantes de MeLi (Marca, Modelo, etc)
+          const attributes = item.attributes?.filter(a => a.id === 'BRAND' || a.id === 'MODEL' || a.id === 'PACKAGE_TYPE' || a.id === 'VOLUME') || [];
+          
           setMeliData({ 
             found: true, 
             title: item.title, 
-            price: item.price, 
             thumbnail: item.thumbnail, 
-            permalink: item.permalink 
+            permalink: item.permalink,
+            specs: attributes // Guardamos los atributos
           });
         } else {
           setMeliData({ found: false });
@@ -31,7 +34,7 @@ export default function Home() {
       })
       .catch(() => setMeliData({ found: false }));
 
-    // 2. CARREFOUR (Desde tu Backend con la búsqueda corregida)
+    // 2. CARREFOUR
     fetch(`/api/compare?ean=${ean}`)
       .then(res => res.json())
       .then(data => setCarrefourData(data))
@@ -40,52 +43,80 @@ export default function Home() {
     setLoading(false);
   };
 
+  // Componente auxiliar para renderizar la tabla de specs
+  const SpecsTable = ({ data, source }) => {
+    if (!data.found) return <p style={{ color: '#666', fontStyle: 'italic' }}>No encontrado</p>;
+
+    return (
+      <div style={{ fontSize: '14px', textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+            <img src={data.thumbnail} style={{ width: '60px', height: '60px', objectFit: 'contain', marginRight: '10px' }} />
+            <h3 style={{ fontSize: '14px', margin: 0, lineHeight: '1.2' }}>{data.title}</h3>
+        </div>
+
+        <div style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '8px' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '12px', textTransform: 'uppercase', color: '#888' }}>Ficha Técnica</h4>
+            
+            {/* Renderizado para Carrefour (Objeto Clave-Valor) */}
+            {source === 'carrefour' && data.specs && (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {Object.entries(data.specs).slice(0, 8).map(([key, value]) => (
+                        <li key={key} style={{ borderBottom: '1px solid #ddd', padding: '5px 0', display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 'bold', color: '#555' }}>{key}:</span>
+                            <span>{value}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {/* Renderizado para Mercado Libre (Array de Objetos) */}
+            {source === 'meli' && data.specs && (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {data.specs.map((attr) => (
+                        <li key={attr.id} style={{ borderBottom: '1px solid #ddd', padding: '5px 0', display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 'bold', color: '#555' }}>{attr.name}:</span>
+                            <span>{attr.value_name}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            
+            {(!data.specs || (Array.isArray(data.specs) && data.specs.length === 0) || (typeof data.specs === 'object' && Object.keys(data.specs).length === 0)) && 
+                <p>Sin especificaciones detalladas.</p>
+            }
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div style={{ maxWidth: '800px', margin: '40px auto', fontFamily: 'sans-serif', padding: '20px' }}>
-      <h1 style={{ textAlign: 'center', color: '#333' }}>Comparador de Precios</h1>
+    <div style={{ maxWidth: '900px', margin: '40px auto', fontFamily: 'sans-serif', padding: '20px' }}>
+      <h1 style={{ textAlign: 'center', color: '#333' }}>Comparador de Fichas Técnicas</h1>
       
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '40px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
         <input 
-          style={{ flex: 1, padding: '15px', fontSize: '18px', borderRadius: '8px', border: '1px solid #ccc' }}
+          style={{ flex: 1, padding: '15px', borderRadius: '8px', border: '1px solid #ccc' }}
           value={ean} 
           onChange={(e) => setEan(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && buscar()}
-          placeholder="Ej: 7790895007217"
+          placeholder="EAN ej: 7790895007217"
         />
-        <button onClick={buscar} disabled={loading} style={{ padding: '0 30px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }}>
-          {loading ? '...' : 'Comparar'}
+        <button onClick={buscar} disabled={loading} style={{ padding: '0 25px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+          {loading ? '...' : 'Analizar'}
         </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {/* Tarjeta Mercado Libre */}
-        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', backgroundColor: 'white' }}>
-          <h2 style={{ color: '#dba900', marginTop: 0 }}>Mercado Libre</h2>
-          {meliData ? (
-            meliData.found ? (
-              <div style={{ textAlign: 'center' }}>
-                <img src={meliData.thumbnail} style={{ height: '120px', objectFit: 'contain' }} />
-                <h3 style={{ fontSize: '14px', height: '40px', overflow: 'hidden' }}>{meliData.title}</h3>
-                <p style={{ fontSize: '28px', fontWeight: 'bold', margin: '10px 0' }}>$ {meliData.price.toLocaleString('es-AR')}</p>
-                <a href={meliData.permalink} target="_blank" style={{ color: '#0070f3', textDecoration: 'none', fontSize: '14px' }}>Ver publicación →</a>
-              </div>
-            ) : <p style={{ color: '#666', textAlign: 'center' }}>No encontrado.</p>
-          ) : <p style={{ color: '#ccc', textAlign: 'center' }}>Esperando...</p>}
+        {/* Columna Mercado Libre */}
+        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ color: '#dba900', marginTop: 0, fontSize: '18px' }}>Mercado Libre</h2>
+          {meliData ? <SpecsTable data={meliData} source="meli" /> : <p style={{color:'#ccc'}}>Esperando...</p>}
         </div>
 
-        {/* Tarjeta Carrefour */}
-        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', backgroundColor: 'white' }}>
-          <h2 style={{ color: '#1e429f', marginTop: 0 }}>Carrefour</h2>
-          {carrefourData ? (
-            carrefourData.found ? (
-              <div style={{ textAlign: 'center' }}>
-                <img src={carrefourData.thumbnail} style={{ height: '120px', objectFit: 'contain' }} />
-                <h3 style={{ fontSize: '14px', height: '40px', overflow: 'hidden' }}>{carrefourData.title}</h3>
-                <p style={{ fontSize: '28px', fontWeight: 'bold', margin: '10px 0' }}>$ {carrefourData.price.toLocaleString('es-AR')}</p>
-                {carrefourData.link && <a href={carrefourData.link} target="_blank" style={{ color: '#0070f3', textDecoration: 'none', fontSize: '14px' }}>Ver en web →</a>}
-              </div>
-            ) : <p style={{ color: '#666', textAlign: 'center' }}>No encontrado.</p>
-          ) : <p style={{ color: '#ccc', textAlign: 'center' }}>Esperando...</p>}
+        {/* Columna Carrefour */}
+        <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ color: '#1e429f', marginTop: 0, fontSize: '18px' }}>Carrefour</h2>
+          {carrefourData ? <SpecsTable data={carrefourData} source="carrefour" /> : <p style={{color:'#ccc'}}>Esperando...</p>}
         </div>
       </div>
     </div>
