@@ -7,7 +7,7 @@ const DOMAIN_MAP = {
   'carrefourar': 'https://www.carrefour.com.ar',
   'fravega': 'https://www.fravega.com',
   'aremsaprod': 'https://www.oncity.com',
-  'jumboargentinaio': 'https://www.jumbo.com.ar' // <--- TU DATO CONFIRMADO
+  'jumboargentinaio': 'https://www.jumbo.com.ar'
 };
 
 // Función genérica con "Disfraz" de Navegador
@@ -16,21 +16,25 @@ async function fetchVtexProduct(accountName, ean) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
 
-    // EL TRUCO: Headers que simulan ser un Chrome real en Windows
+    // Headers que simulan ser un Chrome real (Vital para Jumbo)
     const headers = { 
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'X-Requested-With': 'XMLHttpRequest'
     };
 
+    // --- CORRECCIÓN CRÍTICA AQUÍ ---
+    // Quitamos "&sc=1" de las URLs. Jumbo usa sc=32. Al quitarlo, VTEX busca en todos.
+    
     // 1. Intentamos búsqueda exacta (EAN)
-    let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
+    let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}`;
+    
     let res = await fetch(url, { headers, signal: controller.signal });
     let data = res.ok ? await res.json() : [];
 
     // 2. Si falla, intentamos búsqueda por texto (Plan B)
     if (!Array.isArray(data) || data.length === 0) {
-        url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}&sc=1`;
+        url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}`;
         res = await fetch(url, { headers, signal: controller.signal });
         data = res.ok ? await res.json() : [];
     }
@@ -87,7 +91,6 @@ export async function GET(request) {
     fetchVtexProduct('carrefourar', ean),
     fetchVtexProduct('fravega', ean),
     fetchVtexProduct('aremsaprod', ean),
-    // Usamos el nombre confirmado 'jumboargentinaio'
     fetchVtexProduct('jumboargentinaio', ean)
   ]);
 
@@ -95,6 +98,6 @@ export async function GET(request) {
       carrefour: results[0],
       fravega: results[1],
       oncity: results[2],
-      jumbo: results[3] // Mapeo para el frontend
+      jumbo: results[3]
   });
 }
