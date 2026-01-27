@@ -26,20 +26,15 @@ export default function Home() {
     if (!data) return;
     setLoadingAi(true);
     
-    // RECOPILAMOS INFO DE LAS 4 TIENDAS AHORA
     const payload = {
-        title: data.fravega?.title || data.carrefour?.title || data.jumbo?.title || "Producto",
+        title: data.fravega?.title || data.carrefour?.title || "Producto",
         descriptions: [
             data.carrefour?.description,
             data.fravega?.description,
             data.oncity?.description,
-            data.jumbo?.description // <--- Sumamos Jumbo a la inteligencia
+            data.jumbo?.description
         ],
-        specs: { 
-            ...data.carrefour?.specs, 
-            ...data.fravega?.specs, 
-            ...data.jumbo?.specs // <--- Specs de Jumbo también
-        }
+        specs: { ...data.carrefour?.specs, ...data.fravega?.specs, ...data.jumbo?.specs }
     };
 
     try {
@@ -49,8 +44,7 @@ export default function Home() {
         });
         const json = await res.json();
         if (json.result) {
-            const cleanHtml = json.result.replace(/```html/g, '').replace(/```/g, '');
-            setAiContent(cleanHtml);
+            setAiContent(json.result);
         }
     } catch (e) {
         console.error(e);
@@ -65,11 +59,11 @@ export default function Home() {
     </span>
   );
 
-  const ProductCard = ({ product, storeName, brandColor }) => {
+  const ProductCard = ({ product, storeName, brandColor, isMain = false }) => {
     const [activeTab, setActiveTab] = useState('desc');
     
     if (!product || !product.found) return (
-        <div className="card empty-card">
+        <div className={`card empty-card ${isMain ? 'main-empty' : ''}`}>
             <div style={{ opacity: 0.5, textAlign: 'center' }}>
                 <h3 style={{ color: '#aaa', margin: 0 }}>{storeName}</h3>
                 <p style={{ fontSize: '12px', color: '#888' }}>Sin datos</p>
@@ -78,7 +72,7 @@ export default function Home() {
     );
 
     return (
-      <div className="card" style={{ borderTop: `4px solid ${brandColor}` }}>
+      <div className={`card ${isMain ? 'main-card' : ''}`} style={{ borderTop: `4px solid ${brandColor}` }}>
         <div className="card-header">
             <Badge color={brandColor}>{storeName}</Badge>
             <span style={{fontSize:'12px', fontWeight:'bold', color: product.price > 0 ? '#10b981' : '#ef4444'}}>
@@ -113,24 +107,34 @@ export default function Home() {
   return (
     <div className="container">
       <style jsx global>{`
-        body { background-color: #f8fafc; color: #0f172a; font-family: sans-serif; margin: 0; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; } /* Más ancho para 4 columnas */
+        body { background-color: #f1f5f9; color: #0f172a; font-family: sans-serif; margin: 0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
+        
         .header { text-align: center; margin-bottom: 30px; }
         
-        .search-wrapper { background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; gap: 10px; max-width: 600px; margin: 0 auto 20px auto; }
+        .search-wrapper { background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; gap: 10px; max-width: 600px; margin: 0 auto 30px auto; }
         .search-input { flex: 1; border: none; padding: 10px; font-size: 16px; outline: none; }
         .search-btn { background: #0f172a; color: white; border: none; padding: 0 25px; border-radius: 8px; cursor: pointer; }
         
         .ai-panel { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 1px solid #bae6fd; padding: 20px; border-radius: 16px; margin-bottom: 40px; text-align: center; }
         .ai-btn { background: linear-gradient(90deg, #4f46e5, #06b6d4); color: white; border: none; padding: 12px 30px; border-radius: 30px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 4px 10px rgba(6,182,212,0.3); transition: transform 0.2s; }
-        .ai-btn:hover { transform: scale(1.05); }
         .ai-result { text-align: left; margin-top: 20px; background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; position: relative; }
         .copy-btn { position: absolute; top: 10px; right: 10px; background: #f1f5f9; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
 
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        /* SECCIONES DE LAYOUT */
+        .section-title { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; text-align: center; }
         
-        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 600px; display: flex; flex-direction: column; }
+        .main-stage { display: flex; justify-content: center; margin-bottom: 40px; }
+        .main-card { width: 100%; max-width: 450px; border: 2px solid #1e429f; transform: scale(1.02); }
+        .main-empty { max-width: 450px; border: 2px dashed #cbd5e1; }
+
+        .competitors-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        
+        /* CARDS */
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 600px; display: flex; flex-direction: column; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
         .empty-card { border: 2px dashed #cbd5e1; background: #f8fafc; box-shadow: none; justify-content: center; }
+        
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .product-hero { text-align: center; margin-bottom: 15px; }
         .product-hero img { height: 100px; object-fit: contain; }
@@ -146,7 +150,6 @@ export default function Home() {
         .html-desc img { max-width: 100%; height: auto; margin: 10px 0; }
         .specs-list { padding: 0; list-style: none; }
         .specs-list li { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
-        .specs-list li strong { color: #334155; }
       `}</style>
 
       <div className="header">
@@ -154,33 +157,44 @@ export default function Home() {
       </div>
       
       <div className="search-wrapper">
-        <input className="search-input" value={ean} onChange={(e) => setEan(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && buscar()} placeholder="EAN (Ej: 8806090972740)" />
+        <input className="search-input" value={ean} onChange={(e) => setEan(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && buscar()} placeholder="EAN (Ej: 8806095130521)" />
         <button className="search-btn" onClick={buscar} disabled={loading}>{loading ? '...' : 'Buscar'}</button>
       </div>
 
       {data && (
-        <div className="ai-panel">
-            <button className="ai-btn" onClick={generarDescripcionIA} disabled={loadingAi}>
-                {loadingAi ? '✨ Redactando con IA...' : '✨ Generar Ficha Maestra con IA'}
-            </button>
-            
-            {aiContent && (
-                <div className="ai-result">
-                    <button className="copy-btn" onClick={() => navigator.clipboard.writeText(aiContent)}>Copiar HTML</button>
-                    <div dangerouslySetInnerHTML={{ __html: aiContent }} />
-                </div>
-            )}
-        </div>
-      )}
+        <>
+            {/* SECCIÓN IA */}
+            <div className="ai-panel">
+                <button className="ai-btn" onClick={generarDescripcionIA} disabled={loadingAi}>
+                    {loadingAi ? '✨ Redactando...' : '✨ Generar Ficha Maestra con IA'}
+                </button>
+                {aiContent && (
+                    <div className="ai-result">
+                        <button className="copy-btn" onClick={() => navigator.clipboard.writeText(aiContent)}>Copiar HTML</button>
+                        <div dangerouslySetInnerHTML={{ __html: aiContent }} />
+                    </div>
+                )}
+            </div>
 
-      {data && (
-          <div className="grid">
-            <ProductCard product={data.carrefour} storeName="Carrefour" brandColor="#1e429f" />
-            <ProductCard product={data.fravega} storeName="Frávega" brandColor="#7526d9" />
-            <ProductCard product={data.oncity} storeName="OnCity" brandColor="#00c3e3" />
-            {/* NUEVA TARJETA JUMBO */}
-            <ProductCard product={data.jumbo} storeName="Jumbo" brandColor="#009e0f" />
-          </div>
+            {/* SECCIÓN 1: NUESTRA TIENDA (Destacada) */}
+            <h3 className="section-title">Nuestra Referencia</h3>
+            <div className="main-stage">
+                <ProductCard 
+                    product={data.carrefour} 
+                    storeName="Carrefour" 
+                    brandColor="#1e429f" 
+                    isMain={true} // Propiedad especial para destacar
+                />
+            </div>
+
+            {/* SECCIÓN 2: MERCADO (Competencia en Fila) */}
+            <h3 className="section-title">Análisis de Mercado</h3>
+            <div className="competitors-grid">
+                <ProductCard product={data.fravega} storeName="Frávega" brandColor="#7526d9" />
+                <ProductCard product={data.oncity} storeName="OnCity" brandColor="#00c3e3" />
+                <ProductCard product={data.jumbo} storeName="Jumbo" brandColor="#009e0f" />
+            </div>
+        </>
       )}
     </div>
   );
