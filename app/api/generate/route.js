@@ -30,9 +30,8 @@ export async function POST(request) {
       <ul><li>...</li></ul>
     `;
 
-    // CAMBIO CLAVE: Usamos 'gemini-pro' en 'v1beta'.
-    // Esta es la combinación "Legacy" que suele funcionar cuando los modelos nuevos dan error de ruta.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+    // CAMBIO DEFINITIVO: Usamos el modelo que SI tienes en tu lista: 'gemini-2.5-flash'
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
         method: 'POST',
