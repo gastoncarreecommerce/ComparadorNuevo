@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 
-// Mapa de dominios públicos para corregir los enlaces de VTEX
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+// Mapa de dominios para corregir enlaces internos de VTEX
 const DOMAIN_MAP = {
   'carrefourar': 'https://www.carrefour.com.ar',
   'fravega': 'https://www.fravega.com',
-  'aremsaprod': 'https://www.oncity.com'
+  'aremsaprod': 'https://www.oncity.com',
+  'jumboargentina': 'https://www.jumbo.com.ar' // <--- NUEVO
 };
 
-// Función "Blindada" para consultar VTEX (Intenta EAN exacto, y si falla, busca texto)
 async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
   try {
     const headers = { 'Accept': 'application/json' };
@@ -19,13 +22,12 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    // ESTRATEGIA 1: Búsqueda Técnica (Exacta por EAN)
+    // Estrategia 1: Búsqueda Técnica (EAN)
     let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
-    
     let res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
     let data = res.ok ? await res.json() : [];
 
-    // ESTRATEGIA 2: Búsqueda de Texto (Si la técnica falló)
+    // Estrategia 2: Texto (Respaldo)
     if (!Array.isArray(data) || data.length === 0) {
         url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}&sc=1`;
         res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
@@ -37,7 +39,6 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
       
-      // Extraer Specs
       let specs = {};
       if (item.allSpecifications && Array.isArray(item.allSpecifications)) {
         item.allSpecifications.forEach(specName => {
@@ -47,24 +48,18 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
         });
       }
 
-      // Extraer Descripción
       const description = item.description || item.metaTagDescription || "";
-
-      // Extraer Precio
       const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
 
-      // --- CORRECCIÓN DE ENLACE ---
+      // Corrección de Link
       let publicLink = item.link;
       try {
-        // Extraemos el path (ej: /producto/p) y le ponemos el dominio público
         const urlObj = new URL(item.link);
         const publicDomain = DOMAIN_MAP[accountName];
         if (publicDomain) {
           publicLink = `${publicDomain}${urlObj.pathname}`;
         }
-      } catch (error) {
-        console.error(`Error construyendo enlace público para ${accountName}:`, error);
-      }
+      } catch (e) {}
       
       if (offer) {
         return {
@@ -73,7 +68,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
           title: item.productName,
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
-          link: publicLink, // <--- Usamos el enlace corregido
+          link: publicLink,
           description: description,
           specs: specs
         };
@@ -82,7 +77,6 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     return { found: false, store: accountName };
 
   } catch (e) {
-    console.error(`Error fetching ${accountName}:`, e.message);
     return { found: false, store: accountName };
   }
 }
@@ -96,15 +90,18 @@ export async function GET(request) {
   const C_KEY = process.env.VTEX_APP_KEY;
   const C_TOKEN = process.env.VTEX_APP_TOKEN;
 
+  // AHORA SON 4 TIENDAS
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('aremsaprod', ean) // Cuenta real de OnCity
+    fetchVtexProduct('aremsaprod', ean), // OnCity
+    fetchVtexProduct('jumboargentina', ean) // <--- JUMBO
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
-      oncity: results[2]
+      oncity: results[2],
+      jumbo: results[3] // <--- NUEVO
   });
 }
