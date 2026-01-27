@@ -8,7 +8,7 @@ const DOMAIN_MAP = {
   'carrefourar': 'https://www.carrefour.com.ar',
   'fravega': 'https://www.fravega.com',
   'aremsaprod': 'https://www.oncity.com',
-  'jumboargentina': 'https://www.jumbo.com.ar' // <--- NUEVO
+  'jumboargentinaio': 'https://www.jumbo.com.ar' // <--- NUEVO
 };
 
 async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
@@ -95,7 +95,7 @@ export async function GET(request) {
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
     fetchVtexProduct('aremsaprod', ean), // OnCity
-    fetchVtexProduct('jumboargentina', ean) // <--- JUMBO
+    fetchVtexProduct('jumboargentinaio', ean) // <--- JUMBO
   ]);
 
   return NextResponse.json({
