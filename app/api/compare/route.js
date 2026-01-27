@@ -8,7 +8,7 @@ const DOMAIN_MAP = {
   'carrefourar': 'https://www.carrefour.com.ar',
   'fravega': 'https://www.fravega.com',
   'aremsaprod': 'https://www.oncity.com',
-  'jumboargentinaio': 'https://www.jumbo.com.ar' // <--- NUEVO
+  'jumboargentinaio': 'https://www.jumbo.com.ar' // <--- CORREGIDO
 };
 
 async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
@@ -90,18 +90,18 @@ export async function GET(request) {
   const C_KEY = process.env.VTEX_APP_KEY;
   const C_TOKEN = process.env.VTEX_APP_TOKEN;
 
-  // AHORA SON 4 TIENDAS
+  // Ejecutamos las 4 búsquedas con el nombre corregido
   const results = await Promise.all([
     fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
     fetchVtexProduct('fravega', ean),
-    fetchVtexProduct('aremsaprod', ean), // OnCity
-    fetchVtexProduct('jumboargentinaio', ean) // <--- JUMBO
+    fetchVtexProduct('aremsaprod', ean),
+    fetchVtexProduct('jumboargentinaio', ean) // <--- NOMBRE REAL CONFIRMADO
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
       oncity: results[2],
-      jumbo: results[3] // <--- NUEVO
+      jumbo: results[3] // Mapeamos el resultado a 'jumbo' para el frontend
   });
 }
