@@ -1,66 +1,83 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Forzamos entorno Node.js para estabilidad
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   try {
-    // 1. Validar API KEY
+    // 1. Validar API Key
     const apiKey = process.env.GOOGLE_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: 'Falta la GOOGLE_API_KEY en Vercel.' }, { status: 500 });
+      return NextResponse.json({ error: 'Falta API Key en Vercel' }, { status: 500 });
     }
 
-    // 2. Validar Body
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      return NextResponse.json({ error: 'El JSON enviado no es válido.' }, { status: 400 });
-    }
-
+    // 2. Leer datos
+    const body = await request.json();
     const { title, descriptions, specs } = body;
 
-    if (!title && !descriptions) {
-       return NextResponse.json({ error: 'No hay datos suficientes para generar (faltan título o descripciones).' }, { status: 400 });
-    }
-
-    // 3. Configurar IA
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-    // Limpiamos descripciones vacías para no confundir a la IA
-    const cleanDescriptions = descriptions?.filter(d => d && d.trim().length > 0) || [];
-
+    // 3. Preparar el Prompt
     const prompt = `
-      Actúa como experto en Copywriting para E-commerce.
-      Genera una ficha de producto en HTML limpio (sin etiquetas <html>, ni markdown \`\`\`) para: "${title || 'Producto'}".
-
-      Fuentes de información:
-      ${cleanDescriptions.join('\n\n')}
-
-      Datos técnicos:
+      Actúa como experto en E-commerce.
+      Crea una descripción HTML (solo el contenido div, sin markdown) para: "${title || 'Producto'}".
+      
+      Info base:
+      ${descriptions?.filter(d => d).join('\n') || ''}
+      
+      Specs:
       ${JSON.stringify(specs)}
 
       Estructura requerida:
       <h2>[Título Persuasivo]</h2>
-      <p>[Párrafo de introducción enfocado en beneficios]</p>
-      <h3>Características Destacadas</h3>
-      <ul><li>[Beneficio 1]</li><li>[Beneficio 2]</li></ul>
+      <p>[Intro]</p>
+      <h3>Características</h3>
+      <ul><li>...</li></ul>
     `;
 
-    // 4. Llamada a Google (Protegida)
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
+    // 4. CONEXIÓN DIRECTA ACTUALIZADA (Gemini 1.5 Flash + v1beta)
+    // Cambiamos 'gemini-pro' por 'gemini-1.5-flash' que es el modelo actual rápido y soportado.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contents: [{
+                parts: [{
+                    text: prompt
+                }]
+            }]
+        })
+    });
 
-    return NextResponse.json({ result: text });
+    const data = await response.json();
+
+    // 5. Manejo de errores específicos de Google
+    if (!response.ok) {
+        console.error("Error Google API:", data);
+        // Devolvemos el mensaje exacto que nos da Google para depurar
+        return NextResponse.json({ 
+            error: 'Error de Google', 
+            details: data.error?.message || JSON.stringify(data)
+        }, { status: response.status });
+    }
+
+    // 6. Extraer texto
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!generatedText) {
+        return NextResponse.json({ error: 'La IA no devolvió texto.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ result: generatedText });
 
   } catch (error) {
-    console.error("❌ ERROR DETALLADO IA:", error);
-    
-    // Devolvemos el mensaje exacto del error para que lo veas en la pantalla
+    console.error("Error Servidor:", error);
     return NextResponse.json({ 
-        error: 'Error al procesar con IA', 
-        details: error.message || String(error) 
+        error: 'Error interno', 
+        details: error.message 
     }, { status: 500 });
   }
 }
