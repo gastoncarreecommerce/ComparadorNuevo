@@ -3,34 +3,35 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Mapa de dominios para corregir enlaces internos de VTEX
 const DOMAIN_MAP = {
   'carrefourar': 'https://www.carrefour.com.ar',
   'fravega': 'https://www.fravega.com',
   'aremsaprod': 'https://www.oncity.com',
-  'jumboargentinaio': 'https://www.jumbo.com.ar' // <--- CORREGIDO
+  'jumboargentinaio': 'https://www.jumbo.com.ar' // <--- TU DATO CONFIRMADO
 };
 
-async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null) {
+// Función genérica con "Disfraz" de Navegador
+async function fetchVtexProduct(accountName, ean) {
   try {
-    const headers = { 'Accept': 'application/json' };
-    if (appKey && appToken) {
-      headers['X-VTEX-API-AppKey'] = appKey;
-      headers['X-VTEX-API-AppToken'] = appToken;
-    }
-
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
 
-    // Estrategia 1: Búsqueda Técnica (EAN)
+    // EL TRUCO: Headers que simulan ser un Chrome real en Windows
+    const headers = { 
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'X-Requested-With': 'XMLHttpRequest'
+    };
+
+    // 1. Intentamos búsqueda exacta (EAN)
     let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}&sc=1`;
-    let res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
+    let res = await fetch(url, { headers, signal: controller.signal });
     let data = res.ok ? await res.json() : [];
 
-    // Estrategia 2: Texto (Respaldo)
+    // 2. Si falla, intentamos búsqueda por texto (Plan B)
     if (!Array.isArray(data) || data.length === 0) {
         url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}&sc=1`;
-        res = await fetch(url, { headers, cache: 'no-store', signal: controller.signal });
+        res = await fetch(url, { headers, signal: controller.signal });
         data = res.ok ? await res.json() : [];
     }
     
@@ -40,26 +41,20 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
       const item = data[0];
       
       let specs = {};
-      if (item.allSpecifications && Array.isArray(item.allSpecifications)) {
+      if (item.allSpecifications) {
         item.allSpecifications.forEach(specName => {
-            if (item[specName] && item[specName].length > 0) {
-                specs[specName] = item[specName][0];
-            }
+            if (item[specName]?.[0]) specs[specName] = item[specName][0];
         });
       }
 
-      const description = item.description || item.metaTagDescription || "";
-      const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
-
-      // Corrección de Link
+      // Corrección de Link para que lleve a la web pública
       let publicLink = item.link;
-      try {
-        const urlObj = new URL(item.link);
-        const publicDomain = DOMAIN_MAP[accountName];
-        if (publicDomain) {
-          publicLink = `${publicDomain}${urlObj.pathname}`;
-        }
-      } catch (e) {}
+      const domain = DOMAIN_MAP[accountName];
+      if (domain && item.link) {
+          try { publicLink = `${domain}${new URL(item.link).pathname}`; } catch(e){}
+      }
+
+      const offer = item.items?.[0]?.sellers?.[0]?.commertialOffer;
       
       if (offer) {
         return {
@@ -69,7 +64,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
           price: offer.Price,
           thumbnail: item.items[0].images[0].imageUrl,
           link: publicLink,
-          description: description,
+          description: item.description || "",
           specs: specs
         };
       }
@@ -77,6 +72,7 @@ async function fetchVtexProduct(accountName, ean, appKey = null, appToken = null
     return { found: false, store: accountName };
 
   } catch (e) {
+    console.error(`Error en ${accountName}:`, e.message);
     return { found: false, store: accountName };
   }
 }
@@ -87,21 +83,18 @@ export async function GET(request) {
 
   if (!ean) return NextResponse.json({ error: 'Falta EAN' }, { status: 400 });
 
-  const C_KEY = process.env.VTEX_APP_KEY;
-  const C_TOKEN = process.env.VTEX_APP_TOKEN;
-
-  // Ejecutamos las 4 búsquedas con el nombre corregido
   const results = await Promise.all([
-    fetchVtexProduct('carrefourar', ean, C_KEY, C_TOKEN),
+    fetchVtexProduct('carrefourar', ean),
     fetchVtexProduct('fravega', ean),
     fetchVtexProduct('aremsaprod', ean),
-    fetchVtexProduct('jumboargentinaio', ean) // <--- NOMBRE REAL CONFIRMADO
+    // Usamos el nombre confirmado 'jumboargentinaio'
+    fetchVtexProduct('jumboargentinaio', ean)
   ]);
 
   return NextResponse.json({
       carrefour: results[0],
       fravega: results[1],
       oncity: results[2],
-      jumbo: results[3] // Mapeamos el resultado a 'jumbo' para el frontend
+      jumbo: results[3] // Mapeo para el frontend
   });
 }
