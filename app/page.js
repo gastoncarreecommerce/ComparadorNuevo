@@ -6,7 +6,6 @@ export default function Home() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   
-  // Estados para la IA
   const [aiContent, setAiContent] = useState('');
   const [loadingAi, setLoadingAi] = useState(false);
 
@@ -14,7 +13,7 @@ export default function Home() {
     if (!ean) return;
     setLoading(true);
     setData(null);
-    setAiContent(''); // Limpiar IA anterior
+    setAiContent('');
     try {
       const res = await fetch(`/api/compare?ean=${ean}`);
       const json = await res.json();
@@ -27,15 +26,20 @@ export default function Home() {
     if (!data) return;
     setLoadingAi(true);
     
-    // Recopilamos la data de las 3 tiendas
+    // RECOPILAMOS INFO DE LAS 4 TIENDAS AHORA
     const payload = {
-        title: data.fravega?.title || data.carrefour?.title || "Producto",
+        title: data.fravega?.title || data.carrefour?.title || data.jumbo?.title || "Producto",
         descriptions: [
             data.carrefour?.description,
             data.fravega?.description,
-            data.oncity?.description
+            data.oncity?.description,
+            data.jumbo?.description // <--- Sumamos Jumbo a la inteligencia
         ],
-        specs: { ...data.carrefour?.specs, ...data.fravega?.specs }
+        specs: { 
+            ...data.carrefour?.specs, 
+            ...data.fravega?.specs, 
+            ...data.jumbo?.specs // <--- Specs de Jumbo también
+        }
     };
 
     try {
@@ -45,7 +49,6 @@ export default function Home() {
         });
         const json = await res.json();
         if (json.result) {
-            // Limpiamos los backticks de markdown si la IA los manda
             const cleanHtml = json.result.replace(/```html/g, '').replace(/```/g, '');
             setAiContent(cleanHtml);
         }
@@ -56,7 +59,6 @@ export default function Home() {
     setLoadingAi(false);
   };
 
-  // --- UI COMPONENTS ---
   const Badge = ({ children, color }) => (
     <span style={{ backgroundColor: `${color}15`, color: color, padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', border: `1px solid ${color}40` }}>
       {children}
@@ -112,26 +114,21 @@ export default function Home() {
     <div className="container">
       <style jsx global>{`
         body { background-color: #f8fafc; color: #0f172a; font-family: sans-serif; margin: 0; }
-        .container { max-width: 1300px; margin: 0 auto; padding: 40px 20px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; } /* Más ancho para 4 columnas */
         .header { text-align: center; margin-bottom: 30px; }
         
-        /* BUSCADOR */
         .search-wrapper { background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; gap: 10px; max-width: 600px; margin: 0 auto 20px auto; }
         .search-input { flex: 1; border: none; padding: 10px; font-size: 16px; outline: none; }
         .search-btn { background: #0f172a; color: white; border: none; padding: 0 25px; border-radius: 8px; cursor: pointer; }
         
-        /* IA GENERATOR SECTION */
         .ai-panel { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 1px solid #bae6fd; padding: 20px; border-radius: 16px; margin-bottom: 40px; text-align: center; }
         .ai-btn { background: linear-gradient(90deg, #4f46e5, #06b6d4); color: white; border: none; padding: 12px 30px; border-radius: 30px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 4px 10px rgba(6,182,212,0.3); transition: transform 0.2s; }
         .ai-btn:hover { transform: scale(1.05); }
-        .ai-btn:disabled { opacity: 0.7; cursor: wait; }
         .ai-result { text-align: left; margin-top: 20px; background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; position: relative; }
         .copy-btn { position: absolute; top: 10px; right: 10px; background: #f1f5f9; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
 
-        /* GRID */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         
-        /* CARDS */
         .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 600px; display: flex; flex-direction: column; }
         .empty-card { border: 2px dashed #cbd5e1; background: #f8fafc; box-shadow: none; justify-content: center; }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -139,7 +136,6 @@ export default function Home() {
         .product-hero img { height: 100px; object-fit: contain; }
         .product-title { display: block; font-size: 14px; font-weight: 600; color: #334155; text-decoration: none; margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* TABS & CONTENT */
         .tabs { display: flex; border-bottom: 1px solid #e2e8f0; }
         .tab-btn { flex: 1; background: none; border: none; padding: 10px; font-size: 12px; font-weight: 600; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; }
         .tab-btn.active { color: #0f172a; border-bottom-color: #0f172a; }
@@ -147,7 +143,6 @@ export default function Home() {
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         
-        /* HTML Content Styles */
         .html-desc img { max-width: 100%; height: auto; margin: 10px 0; }
         .specs-list { padding: 0; list-style: none; }
         .specs-list li { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
@@ -163,7 +158,6 @@ export default function Home() {
         <button className="search-btn" onClick={buscar} disabled={loading}>{loading ? '...' : 'Buscar'}</button>
       </div>
 
-      {/* SECCIÓN IA: Solo aparece si ya buscamos algo */}
       {data && (
         <div className="ai-panel">
             <button className="ai-btn" onClick={generarDescripcionIA} disabled={loadingAi}>
@@ -184,6 +178,8 @@ export default function Home() {
             <ProductCard product={data.carrefour} storeName="Carrefour" brandColor="#1e429f" />
             <ProductCard product={data.fravega} storeName="Frávega" brandColor="#7526d9" />
             <ProductCard product={data.oncity} storeName="OnCity" brandColor="#00c3e3" />
+            {/* NUEVA TARJETA JUMBO */}
+            <ProductCard product={data.jumbo} storeName="Jumbo" brandColor="#009e0f" />
           </div>
       )}
     </div>
