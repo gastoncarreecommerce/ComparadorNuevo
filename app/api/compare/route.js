@@ -15,30 +15,34 @@ async function fetchVtexProduct(accountName, ean) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    // --- CONFIGURACIÓN DE HEADERS DIFERENCIADA ---
+    // 1. HEADER BASE (OBLIGATORIO PARA TODOS):
+    // Si no enviamos esto, VTEX bloquea con Error 403
     let headers = { 
-        'Accept': 'application/json' 
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
-    // SOLO nos disfrazamos para JUMBO (porque tiene firewall)
-    // A Carrefour y Frávega no les mandamos esto porque se pueden romper.
+    // 2. HEADER ESPECIAL SOLO PARA JUMBO:
+    // Jumbo necesita este extra para creer que es una navegación AJAX legítima.
+    // NO se lo mandamos a Carrefour porque a veces oculta la descripción.
     if (accountName.includes('jumbo')) {
-        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
         headers['X-Requested-With'] = 'XMLHttpRequest';
     }
 
-    // 1. Búsqueda por EAN
-    // Quitamos el "&sc=1" para evitar problemas con Jumbo (sc=32) y otros.
+    // URL sin '&sc=1' para evitar errores de canal
     let url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?fq=alternateIds_Ean:${ean}`;
     
     let res = await fetch(url, { headers, signal: controller.signal });
-    let data = res.ok ? await res.json() : [];
-
-    // 2. Fallback: Búsqueda por Texto
-    if (!Array.isArray(data) || data.length === 0) {
+    
+    // Si falla la búsqueda exacta, probamos texto (Plan B)
+    let data = [];
+    if (res.ok) {
+        data = await res.json();
+    } else {
+        // Si falló (403/404), intentamos el Plan B inmediatamente
         url = `https://${accountName}.vtexcommercestable.com.br/api/catalog_system/pub/products/search?ft=${ean}`;
         res = await fetch(url, { headers, signal: controller.signal });
-        data = res.ok ? await res.json() : [];
+        if (res.ok) data = await res.json();
     }
     
     clearTimeout(timeoutId);
@@ -46,7 +50,6 @@ async function fetchVtexProduct(accountName, ean) {
     if (Array.isArray(data) && data.length > 0) {
       const item = data[0];
       
-      // Extraer Specs
       let specs = {};
       if (item.allSpecifications) {
         item.allSpecifications.forEach(specName => {
@@ -55,17 +58,16 @@ async function fetchVtexProduct(accountName, ean) {
       }
 
       // --- RESCATE DE DESCRIPCIÓN ---
-      // Prioridad: 1. Description, 2. MetaTag, 3. Specs ocultas
       let description = item.description || item.metaTagDescription || "";
       
-      if (!description || description.length < 10) {
-          const hiddenFields = ['Descripción', 'Descripcion', 'Marketing', 'Presentación', 'Caracteristicas generales'];
+      // Si está vacía, buscamos en lugares comunes donde esconden el texto
+      if (!description || description.length < 20) {
+          const hiddenFields = ['Descripción', 'Descripcion', 'Marketing', 'Presentación', 'Caracteristicas generales', 'General'];
           for (const field of hiddenFields) {
               if (specs[field]) {
                   description = specs[field];
                   break;
               }
-              // A veces Carrefour lo pone en la raíz con nombre en español
               if (item[field] && item[field][0]) {
                   description = item[field][0];
                   break;
@@ -73,7 +75,7 @@ async function fetchVtexProduct(accountName, ean) {
           }
       }
 
-      // Link público
+      // Link público corregido
       let publicLink = item.link;
       const domain = DOMAIN_MAP[accountName];
       if (domain && item.link) {
