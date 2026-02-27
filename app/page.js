@@ -9,6 +9,9 @@ export default function Home() {
   const [aiContent, setAiContent] = useState('');
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const [csvFile, setCsvFile] = useState(null);
+  const [loadingCsv, setLoadingCsv] = useState(false);
+
   const buscar = async () => {
     if (!ean) return;
     setLoading(true);
@@ -51,6 +54,41 @@ export default function Home() {
         alert("Error al conectar con la IA");
     }
     setLoadingAi(false);
+  };
+
+  const procesarCsvMasivo = async () => {
+    if (!csvFile) {
+      alert('Subí un CSV primero');
+      return;
+    }
+
+    setLoadingCsv(true);
+    try {
+      const form = new FormData();
+      form.append('file', csvFile);
+
+      const res = await fetch('/api/batch', {
+        method: 'POST',
+        body: form
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'No se pudo procesar el CSV');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'descripciones-vtex.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || 'Error procesando CSV');
+    }
+    setLoadingCsv(false);
   };
 
   const Badge = ({ children, color }) => (
@@ -115,6 +153,10 @@ export default function Home() {
         .search-wrapper { background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; gap: 10px; max-width: 600px; margin: 0 auto 30px auto; }
         .search-input { flex: 1; border: none; padding: 10px; font-size: 16px; outline: none; }
         .search-btn { background: #0f172a; color: white; border: none; padding: 0 25px; border-radius: 8px; cursor: pointer; }
+
+        .batch-panel { background: white; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; max-width: 760px; margin: 0 auto 24px auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .batch-btn { background: #1d4ed8; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .batch-help { font-size: 12px; color: #64748b; width: 100%; }
         
         .ai-panel { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 1px solid #bae6fd; padding: 20px; border-radius: 16px; margin-bottom: 40px; text-align: center; }
         .ai-btn { background: linear-gradient(90deg, #4f46e5, #06b6d4); color: white; border: none; padding: 12px 30px; border-radius: 30px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 4px 10px rgba(6,182,212,0.3); transition: transform 0.2s; }
@@ -159,6 +201,17 @@ export default function Home() {
       <div className="search-wrapper">
         <input className="search-input" value={ean} onChange={(e) => setEan(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && buscar()} placeholder="EAN (Ej: 8806095130521)" />
         <button className="search-btn" onClick={buscar} disabled={loading}>{loading ? '...' : 'Buscar'}</button>
+      </div>
+
+      <div className="batch-panel">
+        <strong>Modo nuevo: CSV masivo de EANs</strong>
+        <input type="file" accept=".csv,text/csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} />
+        <button className="batch-btn" onClick={procesarCsvMasivo} disabled={loadingCsv}>
+          {loadingCsv ? 'Procesando...' : 'Generar CSV con descripciones VTEX'}
+        </button>
+        <div className="batch-help">
+          Subí un CSV con columna <b>EAN</b> (o GTIN/barcode). Se descarga un nuevo CSV con el EAN y descripciones de Carrefour, Frávega, OnCity y Jumbo.
+        </div>
       </div>
 
       {data && (
