@@ -213,7 +213,7 @@ export default function Home() {
           Descargar template CSV
         </a>
         <div className="batch-help">
-          Subí un CSV con columna <b>ean</b> (o GTIN/barcode). Tip: podés bajar el template y pegar los EANs ahí. Se descarga un nuevo CSV con descripciones de Carrefour, Frávega, OnCity y Jumbo.
+          Subí un CSV con columna <b>ean</b> (o GTIN/barcode). Tip: podés bajar el template y pegar los EANs ahí. Se descarga un nuevo CSV con descripciones de Carrefour, Frávega, OnCity y Jumbo + una <b>descripcion_unificada</b>.
         </div>
       </div>
 

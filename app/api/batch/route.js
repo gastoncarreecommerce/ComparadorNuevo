@@ -15,6 +15,53 @@ function escapeCsv(value = '') {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function stripHtml(html = '') {
+  return String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildMergedDescription({ title = '', descriptions = [] }) {
+  const clean = descriptions
+    .map(stripHtml)
+    .filter(Boolean)
+    .map((d) => d.replace(/\s+/g, ' ').trim());
+
+  if (!clean.length) return '';
+
+  const sentencePool = [];
+  for (const text of clean) {
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 20 && s.length < 280);
+    sentencePool.push(...sentences);
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const s of sentencePool) {
+    const key = s.toLowerCase().replace(/[^a-z0-9áéíóúñü ]/gi, '').replace(/\s+/g, ' ').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(s);
+  }
+
+  let merged = unique.slice(0, 4).join(' ');
+  if (!merged) merged = clean.sort((a, b) => b.length - a.length)[0] || '';
+
+  if (title && !merged.toLowerCase().includes(title.toLowerCase())) {
+    merged = `${title}. ${merged}`.trim();
+  }
+
+  return merged.slice(0, 900);
+}
+
 function parseCsvLine(line, separator) {
   const out = [];
   let curr = '';
@@ -203,7 +250,12 @@ export async function POST(request) {
         fetchVtexProduct('jumboargentinaio', ean),
       ]);
 
-      rows.push({ ean, carrefour, fravega, oncity, jumbo });
+      const mergedDescription = buildMergedDescription({
+        title: carrefour.title || fravega.title || oncity.title || jumbo.title || '',
+        descriptions: [carrefour.description, fravega.description, oncity.description, jumbo.description],
+      });
+
+      rows.push({ ean, carrefour, fravega, oncity, jumbo, mergedDescription });
     }
 
     const header = [
@@ -212,6 +264,7 @@ export async function POST(request) {
       'fravega_title', 'fravega_description',
       'oncity_title', 'oncity_description',
       'jumbo_title', 'jumbo_description',
+      'descripcion_unificada',
     ];
 
     const lines = [header.map(escapeCsv).join(',')];
@@ -227,6 +280,7 @@ export async function POST(request) {
         row.oncity.description,
         row.jumbo.title,
         row.jumbo.description,
+        row.mergedDescription,
       ].map(escapeCsv).join(','));
     }
 
