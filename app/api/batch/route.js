@@ -62,6 +62,41 @@ function buildMergedDescription({ title = '', descriptions = [] }) {
   return merged.slice(0, 900);
 }
 
+async function buildAiDescription({ title = '', descriptions = [] }) {
+  const clean = descriptions.map(stripHtml).filter(Boolean).slice(0, 4);
+  if (!clean.length) return '';
+
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    return buildMergedDescription({ title, descriptions });
+  }
+
+  try {
+    const prompt = `Sos redactor e-commerce en español rioplatense.\n\nProducto: ${title || 'Producto'}\n\nFuentes:\n${clean.map((d, i) => `${i + 1}) ${d}`).join('\n')}\n\nTarea: escribí una sola descripción final atractiva, clara y sin humo, de entre 70 y 120 palabras.\nReglas:\n- Solo texto plano (sin HTML ni markdown).\n- No inventes características no presentes en las fuentes.\n- Evitá repeticiones.\n- Tono comercial pero creíble.`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.5, maxOutputTokens: 220 },
+      }),
+    });
+
+    if (!response.ok) {
+      return buildMergedDescription({ title, descriptions });
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) return buildMergedDescription({ title, descriptions });
+
+    return text.slice(0, 1200);
+  } catch {
+    return buildMergedDescription({ title, descriptions });
+  }
+}
+
 function parseCsvLine(line, separator) {
   const out = [];
   let curr = '';
@@ -250,7 +285,7 @@ export async function POST(request) {
         fetchVtexProduct('jumboargentinaio', ean),
       ]);
 
-      const mergedDescription = buildMergedDescription({
+      const mergedDescription = await buildAiDescription({
         title: carrefour.title || fravega.title || oncity.title || jumbo.title || '',
         descriptions: [carrefour.description, fravega.description, oncity.description, jumbo.description],
       });
@@ -264,7 +299,7 @@ export async function POST(request) {
       'fravega_title', 'fravega_description',
       'oncity_title', 'oncity_description',
       'jumbo_title', 'jumbo_description',
-      'descripcion_unificada',
+      'descripcion_nueva_ia',
     ];
 
     const lines = [header.map(escapeCsv).join(',')];
