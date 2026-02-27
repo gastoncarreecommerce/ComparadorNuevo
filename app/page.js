@@ -209,8 +209,11 @@ export default function Home() {
         <button className="batch-btn" onClick={procesarCsvMasivo} disabled={loadingCsv}>
           {loadingCsv ? 'Procesando...' : 'Generar CSV con descripciones VTEX'}
         </button>
+        <a className="batch-btn" style={{textDecoration:'none', background:'#334155'}} href="/api/batch-template">
+          Descargar template CSV
+        </a>
         <div className="batch-help">
-          Subí un CSV con columna <b>EAN</b> (o GTIN/barcode). Se descarga un nuevo CSV con el EAN y descripciones de Carrefour, Frávega, OnCity y Jumbo.
+          Subí un CSV con columna <b>ean</b> (o GTIN/barcode). Tip: podés bajar el template y pegar los EANs ahí. Se descarga un nuevo CSV con descripciones de Carrefour, Frávega, OnCity y Jumbo.
         </div>
       </div>
 

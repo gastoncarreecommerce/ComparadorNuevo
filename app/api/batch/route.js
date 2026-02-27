@@ -71,13 +71,28 @@ function extractEansFromCsv(csvText = '') {
   const eanHeaderIndex = header.findIndex((h) => /^(ean|gtin|barcode|codigo|c[oó]digo)$/.test(h));
 
   const startAt = eanHeaderIndex >= 0 ? 1 : 0;
-  const index = eanHeaderIndex >= 0 ? eanHeaderIndex : 0;
-
   const eans = [];
+
   for (let i = startAt; i < lines.length; i++) {
     const cols = parseCsvLine(lines[i], separator);
-    const raw = (cols[index] || '').replace(/[^0-9]/g, '');
-    if (raw.length >= 8) eans.push(raw);
+
+    // 1) Si hay columna ean reconocida, priorizarla
+    if (eanHeaderIndex >= 0) {
+      const raw = (cols[eanHeaderIndex] || '').replace(/[^0-9]/g, '');
+      if (raw.length >= 8 && raw.length <= 14) {
+        eans.push(raw);
+        continue;
+      }
+    }
+
+    // 2) Fallback: buscar un EAN válido en cualquier columna
+    for (const col of cols) {
+      const raw = String(col || '').replace(/[^0-9]/g, '');
+      if (raw.length >= 8 && raw.length <= 14) {
+        eans.push(raw);
+        break;
+      }
+    }
   }
 
   return [...new Set(eans)];
@@ -173,7 +188,10 @@ export async function POST(request) {
     const eans = extractEansFromCsv(csvText);
 
     if (!eans.length) {
-      return NextResponse.json({ error: 'No encontré EANs válidos en el CSV.' }, { status: 400 });
+      return NextResponse.json({
+        error: 'No encontré EANs válidos en el CSV.',
+        hint: 'Usá el template en /api/batch-template (columna ean) o incluí un EAN de 8 a 14 dígitos en alguna columna.'
+      }, { status: 400 });
     }
 
     const rows = [];
