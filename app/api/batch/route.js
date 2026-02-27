@@ -72,7 +72,23 @@ async function buildAiDescription({ title = '', descriptions = [] }) {
   }
 
   try {
-    const prompt = `Sos redactor e-commerce en español rioplatense.\n\nProducto: ${title || 'Producto'}\n\nFuentes:\n${clean.map((d, i) => `${i + 1}) ${d}`).join('\n')}\n\nTarea: escribí una sola descripción final atractiva, clara y sin humo, de entre 70 y 120 palabras.\nReglas:\n- Solo texto plano (sin HTML ni markdown).\n- No inventes características no presentes en las fuentes.\n- Evitá repeticiones.\n- Tono comercial pero creíble.`;
+    const prompt = `Actúa como experto en E-commerce.
+Crea una descripción para: "${title || 'Producto'}".
+
+Info base:
+${clean.join('\n')}
+
+Estructura deseada:
+- Párrafo de apertura claro y persuasivo
+- Beneficios/atributos clave
+- Cierre breve orientado a conversión
+
+Reglas:
+- Solo texto plano (sin HTML ni markdown)
+- No inventes características no presentes en las fuentes
+- Evitá repeticiones
+- Tono comercial pero creíble
+- Longitud aproximada: 70 a 120 palabras`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
