@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import ExcelJS from 'exceljs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -309,39 +310,56 @@ export async function POST(request) {
       rows.push({ ean, carrefour, fravega, oncity, jumbo, mergedDescription });
     }
 
-    const header = [
-      'ean',
-      'carrefour_title', 'carrefour_description',
-      'fravega_title', 'fravega_description',
-      'oncity_title', 'oncity_description',
-      'jumbo_title', 'jumbo_description',
-      'descripcion_nueva_ia',
-    ];
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Descripciones VTEX');
 
-    const lines = [header.map(escapeCsv).join(',')];
+    const columns = [
+      { header: 'EAN', key: 'ean', width: 16 },
+      { header: 'Carrefour Título', key: 'carrefour_title', width: 30 },
+      { header: 'Carrefour Descripción', key: 'carrefour_description', width: 50 },
+      { header: 'Frávega Título', key: 'fravega_title', width: 30 },
+      { header: 'Frávega Descripción', key: 'fravega_description', width: 50 },
+      { header: 'OnCity Título', key: 'oncity_title', width: 30 },
+      { header: 'OnCity Descripción', key: 'oncity_description', width: 50 },
+      { header: 'Jumbo Título', key: 'jumbo_title', width: 30 },
+      { header: 'Jumbo Descripción', key: 'jumbo_description', width: 50 },
+      { header: 'Descripción Nueva IA', key: 'descripcion_nueva_ia', width: 60 },
+    ];
+    sheet.columns = columns;
+
+    // Style header row
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    headerRow.alignment = { vertical: 'middle', wrapText: true };
 
     for (const row of rows) {
-      lines.push([
-        row.ean,
-        row.carrefour.title,
-        row.carrefour.description,
-        row.fravega.title,
-        row.fravega.description,
-        row.oncity.title,
-        row.oncity.description,
-        row.jumbo.title,
-        row.jumbo.description,
-        row.mergedDescription,
-      ].map(escapeCsv).join(','));
+      sheet.addRow({
+        ean: row.ean,
+        carrefour_title: row.carrefour.title,
+        carrefour_description: stripHtml(row.carrefour.description),
+        fravega_title: row.fravega.title,
+        fravega_description: stripHtml(row.fravega.description),
+        oncity_title: row.oncity.title,
+        oncity_description: stripHtml(row.oncity.description),
+        jumbo_title: row.jumbo.title,
+        jumbo_description: stripHtml(row.jumbo.description),
+        descripcion_nueva_ia: row.mergedDescription,
+      });
     }
 
-    const outCsv = lines.join('\n');
+    // Enable text wrap on all data cells
+    sheet.eachRow((r, idx) => {
+      if (idx > 1) r.alignment = { vertical: 'top', wrapText: true };
+    });
 
-    return new NextResponse(outCsv, {
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="descripciones-vtex.csv"',
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="descripciones-vtex.xlsx"',
       },
     });
   } catch (e) {

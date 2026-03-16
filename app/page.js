@@ -74,19 +74,19 @@ export default function Home() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'No se pudo procesar el CSV');
+        throw new Error(err.error || 'No se pudo procesar el archivo');
       }
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'descripciones-vtex.csv';
+      a.download = 'descripciones-vtex.xlsx';
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
-      alert(e.message || 'Error procesando CSV');
+      alert(e.message || 'Error procesando archivo');
     }
     setLoadingCsv(false);
   };
@@ -207,13 +207,13 @@ export default function Home() {
         <strong>Modo nuevo: CSV masivo de EANs</strong>
         <input type="file" accept=".csv,text/csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} />
         <button className="batch-btn" onClick={procesarCsvMasivo} disabled={loadingCsv}>
-          {loadingCsv ? 'Procesando...' : 'Generar CSV con descripciones VTEX'}
+          {loadingCsv ? 'Procesando...' : 'Generar Excel con descripciones VTEX'}
         </button>
         <a className="batch-btn" style={{textDecoration:'none', background:'#334155'}} href="/api/batch-template">
           Descargar template CSV
         </a>
         <div className="batch-help">
-          Subí un CSV con columna <b>ean</b> (o GTIN/barcode). Tip: podés bajar el template y pegar los EANs ahí. Se descarga un nuevo CSV con descripciones de Carrefour, Frávega, OnCity y Jumbo + una <b>descripcion_nueva_ia</b>.
+          Subí un CSV con columna <b>ean</b> (o GTIN/barcode). Tip: podés bajar el template y pegar los EANs ahí. Se descarga un <b>Excel (.xlsx)</b> con descripciones de Carrefour, Frávega, OnCity y Jumbo + una <b>descripcion_nueva_ia</b>.
         </div>
       </div>
 
